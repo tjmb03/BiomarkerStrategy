@@ -1,0 +1,160 @@
+---
+title: "biomarker-mofa2-demo"
+author: "Bo Ma"
+date: "2026-02-12"
+output: github_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+#This notebook demonstrates a biomarker discovery workflow. We use MOFA+ (Multi-Omics Factor Analysis) for unsupervised data integration and dimensionality reduction, followed by a Random Forest classifier to predict patient outcomes based on the discovered latent factors.
+
+## 1. Setup & Data Simulation
+#We simulate 100 patients with two omics layers (mRNA and Proteomics). A hidden "Latent Factor 1" drives the differences between Responders and Non-Responders.
+
+```{r data_gen}
+library(MOFA2)
+library(dplyr)
+library(ggplot2)
+library(randomForest)
+library(caret)
+
+set.seed(42)
+n_samples <- 100
+
+# Create Latent Factors (The "Truth")
+factor1 <- rnorm(n_samples) 
+
+# Generate Omics 1: mRNA (500 genes)
+view1 <- matrix(rnorm(n_samples * 500), nrow = 500, ncol = n_samples)
+view1[1:50, ] <- view1[1:50, ] + matrix(rep(factor1, each=50), nrow=50)
+
+# Generate Omics 2: Proteomics (200 proteins)
+view2 <- matrix(rnorm(n_samples * 200), nrow = 200, ncol = n_samples)
+view2[1:30, ] <- view2[1:30, ] + matrix(rep(factor1, each=30), nrow=30)
+
+# Define Outcome based on Factor 1
+prob <- exp(factor1) / (1 + exp(factor1))
+outcome <- as.factor(ifelse(runif(n_samples) < prob, "Responder", "Non_Responder"))
+
+# Format for MOFA
+colnames(view1) <- colnames(view2) <- paste0("Sample_", 1:n_samples)
+rownames(view1) <- paste0("Gene_", 1:500)
+rownames(view2) <- paste0("Prot_", 1:200)
+data_list <- list(mRNA = view1, Proteomics = view2)
+
+```
+
+## 2. MOFA+ Integration
+#We train the MOFA+ model to find the latent factors that explain the variance across both omic views.
+
+
+```{r mofa_train, results='hide'}
+MOFAobj <- create_mofa(data_list)
+MOFAobj <- prepare_mofa(MOFAobj)
+# use_basilisk = TRUE ensures a stable Python environment on Mac/Windows
+MOFAobj <- run_mofa(MOFAobj, outfile = "model.hdf5", use_basilisk = TRUE)
+
+```
+
+## 3. Machine Learning (Supervised)
+#We extract the Factor Scores to use as features for a Random Forest model. This reduces our feature space from 700 variables to 15 stable factors.
+
+```{r ml_train}
+# Extract Factor Scores
+factors <- get_factors(MOFAobj, factors = "all")[[1]]
+df_ml <- as.data.frame(factors)
+df_ml$Target <- outcome
+
+# Data Partitioning
+train_idx <- createDataPartition(df_ml$Target, p = 0.7, list = FALSE)
+train_set <- df_ml[train_idx, ]
+test_set <- df_ml[-train_idx, ]
+
+# Fit Random Forest
+rf_model <- randomForest(Target ~ ., data = train_set, ntree = 500)
+
+# Predictions using explicit stats::predict to avoid namespace conflicts
+preds <- stats::predict(rf_model, test_set)
+confusionMatrix(preds, test_set$Target)
+
+```
+
+
+## 4. Feature Importance
+#We visualize which Factor is most responsible for the prediction. Because Factor 1 was simulated as the "signal," it should appear at the top.
+
+```{r importance}
+varImpPlot(rf_model, main = "Random Forest: Factor Importance")
+
+```
+
+
+##5. Visualizing the Latent Space
+#we can visualize how the patients separate in the MOFA+ latent space.
+
+
+```{r plot_factor}
+plot_factor(MOFAobj, 
+            factor = 1, 
+            color_by = outcome, 
+            add_violin = TRUE) +
+  ggtitle("Separation of Outcomes by Factor 1")
+
+```
+
+## 6. Identifying Biomarker Candidates
+#Since Factor 1 is the primary predictor of response, we look at the "Weights" to see which genes and proteins contribute most to this factor.
+
+```{r loadings}
+
+# Extract weights for Factor 1 from both views
+weights <- get_weights(MOFAobj, views = "all", factors = 1, as.data.frame = TRUE)
+
+# Get top 10 Genes from mRNA view
+top_genes <- weights %>%
+  filter(view == "mRNA") %>%
+  arrange(desc(abs(value))) %>%
+  head(10)
+
+# Get top 10 Proteins from Proteomics view
+top_proteins <- weights %>%
+  filter(view == "Proteomics") %>%
+  arrange(desc(abs(value))) %>%
+  head(10)
+
+print("Top 10 Gene Candidates:")
+print(top_genes)
+
+print("Top 10 Protein Candidates:")
+print(top_proteins)
+
+```
+
+## 7.Visualizing the Top Weights
+#Visualizing the weights helps confirm if the signal is distributed across many features or driven by a few key markers.
+
+```{r plot_weights}
+# MOFA2 built-in plot for top features
+plot_top_weights(MOFAobj, 
+                 view = "mRNA", 
+                 factor = 1, 
+                 nfeatures = 10) + 
+  ggtitle("Top Gene Loadings for Factor 1")
+
+plot_top_weights(MOFAobj, 
+                 view = "Proteomics", 
+                 factor = 1, 
+                 nfeatures = 10) + 
+  ggtitle("Top Protein Loadings for Factor 1")
+```
+
+
