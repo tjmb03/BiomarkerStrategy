@@ -147,7 +147,8 @@ cp pipelines/scvi_cellrank/results/plots/*.png assets/scvi_cellrank/
 Embed in your main README:
 
 ```markdown
-![Violin](assets/scvi_cellrank/violin_absprob_corr.png)
-![Heatmap](assets/scvi_cellrank/heatmap_terminal_mass_delta.png)
-![UMAP Instability](assets/scvi_cellrank/umap_instability.png)
+![Violin](results/plots/violin_absprob_corr.png)
+![Heatmap](results/plots/heatmap_terminal_mass_delta.png)
+![UMAP Instability](results/plots/umap_instability.png)
+![UMAP Low Stability](results/plots/umap_low_stability.png)
 ```
