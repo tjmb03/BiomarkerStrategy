@@ -1,0 +1,18 @@
+{
+  "terminal_states_common": [
+    "1",
+    "0",
+    "2"
+  ],
+  "mean_cellwise_absprob_corr": 1.0,
+  "median_cellwise_absprob_corr": 1.0,
+  "terminal_assignment_match_rate": 1.0,
+  "macrostate_match_rate": 0.913,
+  "macrostate_nmi": 0.014946511944385872,
+  "js_overall_terminal_mass": 0.0,
+  "js_per_state": {
+    "1": 5.702471000684795e-10,
+    "0": 2.0380757510294676e-13,
+    "2": 2.9223053645426245e-10
+  }
+}
