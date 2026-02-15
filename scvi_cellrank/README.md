@@ -1,6 +1,5 @@
 # scVI → Graph Sensitivity → CellRank (GPCCA) Robustness Pipeline
 
-Location: `pipelines/scvi_cellrank/`
 
 This pipeline demonstrates an **auditable robustness** check for fate inference by running **CellRank GPCCA twice** using two alternative neighbor graphs (**PCA** vs **scVI latent**) and comparing the resulting **fate (absorption) probabilities**.
 
@@ -132,19 +131,8 @@ Avoid committing large outputs:
 Add to repo `.gitignore`:
 
 ```gitignore
-pipelines/scvi_cellrank/results/
-results/
-*.h5ad
+*.h5ad >20MB
 ```
-
-To showcase results, copy PNGs into a lightweight `assets/` folder and commit those:
-
-```bash
-mkdir -p assets/scvi_cellrank
-cp pipelines/scvi_cellrank/results/plots/*.png assets/scvi_cellrank/
-```
-
-Embed in your main README:
 
 ```markdown
 ![Violin](results/plots/violin_absprob_corr.png)
